@@ -125,11 +125,7 @@ var projectDir = '/Users/zhujl/github/marketing';
 
 exports.parse({
     files: [
-        projectDir + '/couponAdd.html',
-        projectDir + '/couponDetail.html',
-        projectDir + '/couponGrant.html',
-        projectDir + '/couponList.html',
-        projectDir + '/couponSend.html',
+        projectDir + '/couponAdd.html'
     ],
     amdConfig: {
         baseUrl: projectDir + '/src',
