@@ -5,13 +5,21 @@
 ```javascript
 var node = Node.create('filePath');
 node.walk({
-    // 是否递归遍历
-    recursive: true,
-    // 扩展 html 中的依赖提取规则
+
+    // html 中的依赖提取规则
+
+    // 默认支持以下 4 种（不区分单双引号）
+    // 1. href=""
+    // 2. src=""
+    // 3. require('xx'
+    // 4. require(['xx']
+
+    // 如果需要其他的可自行扩展
+
     htmlRules: [
         {
-            pattern: //g,
-            match: function (result, file, amdConfig) {
+            pattern: /src=['"][^'"]+['"]/gi,
+            match: function (result) {
                 var terms = result.split(/['"]/);
                 if (terms.length === 3) {
                     return terms[1];
@@ -19,18 +27,40 @@ node.walk({
             }
         }
     ],
-    // 扩展 css 中的依赖提取规则
+
+
+    // css 中的依赖提取规则
+
+    // 默认支持以下 2 种（不区分单双引号）
+    // 1. @import ""
+    // 2. url("") 或不需要引号
+
+    // 如果需要其他的可自行扩展
+
     cssRules: [
         {
-            pattern: //g,
-            match: function (result, file, amdConfig) {
+            pattern: /@import\s+['"](?:[^'")]+)['"]/gi,
+            match: function (result, file) {
                 var terms = result.split(/['"]/);
                 if (terms.length === 3) {
-                    return terms[1];
+
+                    var result = terms[1];
+
+                    if (path.extname(result) === '') {
+                        return {
+                            extname: path.extname(file),
+                            raw: result
+                        };
+                    }
+                    else {
+                        return result;
+                    }
+
                 }
             }
         }
     ],
+
     // AMD require config 配置
     amdConfig: {
         baseUrl: '',
@@ -39,7 +69,12 @@ node.walk({
         },
         packages: [
 
-        ]
+        ],
+        combine: {
+            exclude: [
+                '**/*'
+            ]
+        }
     },
     // 处理每一个依赖
     processDependency: function (dependency, node) {
@@ -58,11 +93,18 @@ node.walk({
 });
 ```
 
-var projectDir = '/Users/zhujl/github/marketing';
+## 入口模块
+
+调用 parse() 可生成正向（dependencyMap）和反向依赖表（reverseDependencyMap）
+
+```javascript
+
+// 项目根目录
+var projectDir = '';
 
 exports.parse({
     files: [
-        projectDir + '/couponAdd.html'
+        projectDir + '/index.html'
     ],
     amdConfig: {
         baseUrl: projectDir + '/src',
@@ -115,10 +157,6 @@ exports.parse({
 
         }
 
-        console.log(node.file);
-        console.log(dependency);
-        console.log('-----------------------------------')
-
         var moduleExclude = {
             jquery: 1,
             text: 1,
@@ -141,3 +179,4 @@ exports.parse({
 
     }
 });
+```
