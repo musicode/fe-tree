@@ -3,9 +3,8 @@
  * @author musicode
  */
 
-var fs = require('fs');
+var path = require('path');
 
-var walker = require('./lib/walker');
 var Node = require('./lib/Node');
 var util = require('./lib/util');
 
@@ -26,54 +25,85 @@ var dependencyMap = { };
 var reverseDependencyMap = { };
 
 /**
- * 分析入口文件，可以是一个或多个
+ * 把两个 map 转成可输出的格式
  *
- * @param {Object} files
- * @return {Object}
+ * @param {Object|Array} obj
+ * @return {Object|Array}
  */
-exports.parse = function (files, amdConfig) {
+function toJSON(obj) {
+    var result = Array.isArray(obj) ? [ ] : { };
+    util.each(
+        obj,
+        function (value, key) {
+            if (value instanceof Node) {
+                value = value.toJSON();
+            }
+            else if (Array.isArray(value)) {
+                value = toJSON(value);
+            }
+            result[ key ] = value;
+        }
+    );
+    return result;
+}
 
-    var process = function (file) {
+/**
+ * 分析入口文件，生成正反两棵依赖树
+ *
+ * @param {Object} options
+ * @property {Array} options.files 入口文件
+ * @property {Array=} options.htmlRules 分析 html 文件的扩展规则
+ * @property {Array=} options.cssRules 分析 css 文件的扩展规则
+ * @property {Object} options.amdConfig AMD require.config 配置
+ * @property {Function} options.processDependency 处理依赖的函数。方法签名是(dependency, file)
+ */
+exports.parse = function (options) {
+
+    var files = options.files;
+
+    var htmlRules = options.htmlRules;
+    var cssRules = options.cssRules;
+    var amdConfig = options.amdConfig;
+
+    var processFile = function (file) {
+
+        if (dependencyMap[ file ]) {
+            return;
+        }
 
         var node = Node.create(file);
         dependencyMap[ file ] = node;
 
-        var dependencies = walker.walkDependencies(node, amdConfig);
-        dependencies.forEach(
-            function (dependency) {
+        node.walk({
+            htmlRules: htmlRules,
+            cssRules: cssRules,
+            amdConfig: amdConfig,
+            processDependency: function (dependency, node) {
 
-                var absolute = dependency.absolute;
-                if (!fs.existsSync(absolute)) {
-                    return;
-                }
+                if (options.processDependency(dependency, node)
+                    && dependency.file !== node.file
+                ) {
+                    var file = dependency.file;
 
-                var child = process(absolute);
-                node.addChild(child);
-
-                var parents = reverseDependencyMap[ absolute ];
-                if (!Array.isArray(parents)) {
-                    parents = reverseDependencyMap[ absolute ] = [ ];
-                }
-
-                var exists = false;
-
-                parents.forEach(
-                    function (node) {
-                        if (node.file === absolute) {
-                            exists = true;
-                            return false;
-                        }
+                    var child = processFile(file);
+                    if (!child) {
+                        return;
                     }
-                );
 
-                if (!exists) {
-                    parents.push(node);
+                    node.addChild(child);
+
+                    var parents = reverseDependencyMap[ file ];
+                    if (!Array.isArray(parents)) {
+                        parents = reverseDependencyMap[ file ] = [ ];
+                    }
+
+                    if (parents.indexOf(node.file) < 0) {
+                        parents.push(node.file);
+                    }
                 }
-
-
 
             }
-        );
+        });
 
         return node;
 
@@ -83,21 +113,26 @@ exports.parse = function (files, amdConfig) {
         files = [ files ];
     }
 
-    files.forEach(
-        function (file) {
-            process(file);
-        }
-    );
+    files.forEach(processFile);
 
-    util.writeJSON(__dirname + '/dependencyMap.json', dependencyMap);
-    util.writeJSON(__dirname + '/reverseDependencyMap.json', reverseDependencyMap);
+    util.writeJSON(__dirname + '/dependencyMap.json', toJSON(dependencyMap));
+    util.writeJSON(__dirname + '/reverseDependencyMap.json', toJSON(reverseDependencyMap));
 
 };
 
-exports.parse(
-    '/Users/zhujl/github/marketing/couponAdd.html',
-    {
-        baseUrl: '/Users/zhujl/github/marketing/src',
+
+var projectDir = '/Users/zhujl/github/marketing';
+
+exports.parse({
+    files: [
+        projectDir + '/couponAdd.html',
+        projectDir + '/couponDetail.html',
+        projectDir + '/couponGrant.html',
+        projectDir + '/couponList.html',
+        projectDir + '/couponSend.html',
+    ],
+    amdConfig: {
+        baseUrl: projectDir + '/src',
         packages: [
             {
                 name: 'cc',
@@ -110,6 +145,68 @@ exports.parse(
                 main: 'moment'
             }
         ]
+    },
+    processDependency: function (dependency, node) {
+
+        var raw = dependency.raw;
+
+        // 过滤依赖
+        if (/[{}$]/.test(raw)) {
+            return;
+        }
+
+        // 纠正依赖路径
+        if (!dependency.amd) {
+
+            var prefix = {
+                'src': projectDir + '/',
+                'dep': projectDir + '/',
+                '/src': projectDir,
+                '/dep': projectDir,
+                'common': projectDir + '/src/'
+            };
+
+            util.each(
+                prefix,
+                function (value, key) {
+                    if (raw.startsWith(key)) {
+                        dependency.file = value + raw;
+                        return;
+                    }
+                }
+            );
+
+            if (!dependency.file && /^(\.\/|[^./])/.test(raw)) {
+                dependency.file = path.join(node.file, '..', raw);
+            }
+
+        }
+
+        console.log(node.file);
+        console.log(dependency);
+        console.log('-----------------------------------')
+
+        var moduleExclude = {
+            jquery: 1,
+            text: 1,
+            tpl: 1,
+            css: 1,
+            js: 1
+        };
+
+        var rawExclude = {
+            require: 1,
+            exports: 1,
+            module: 1
+        };
+
+        if (!moduleExclude[dependency.module]
+            && !rawExclude[dependency.raw]
+        ) {
+            return dependency;
+        }
+
     }
-);
+});
+
 
