@@ -1,4 +1,4 @@
-# resource-tree
+# fe-tree
 
 ## 节点用法
 
@@ -99,10 +99,12 @@ node.walk({
 
 ```javascript
 
+var feTree = require('fe-tree');
+
 // 项目根目录
 var projectDir = '';
 
-exports.parse({
+feTree.parse({
     files: [
         projectDir + '/index.html'
     ],
@@ -179,4 +181,15 @@ exports.parse({
 
     }
 });
+
+// 正向依赖表
+feTree.dependencyMap;
+
+// 反向依赖表
+feTree.reverseDependencyMap;
+
+// 输出到文件
+feTree.writeJSON('file', feTree.dependencyMap);
+feTree.writeJSON('file', feTree.reverseDependencyMap);
+
 ```

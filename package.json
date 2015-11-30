@@ -1,6 +1,6 @@
 {
   "name": "fe-tree",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "static resource tree",
   "main": "index.js",
   "dependencies": {
@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/musicode/resource-tree.git"
+    "url": "https://github.com/musicode/fe-tree.git"
   },
   "keywords": [
     "static",
@@ -22,7 +22,7 @@
   "author": "musicode",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/musicode/resource-tree/issues"
+    "url": "https://github.com/musicode/fe-tree/issues"
   },
-  "homepage": "https://github.com/musicode/resource-tree"
+  "homepage": "https://github.com/musicode/fe-tree"
 }
