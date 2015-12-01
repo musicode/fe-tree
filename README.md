@@ -1,5 +1,81 @@
 # fe-tree
 
+
+## 节点对象
+
+```
+node.file // 文件路径
+node.content // 文件内容，类型是 Buffer，转字符串用 node.content.toString()
+node.md5 // 获取文件内容的 md5
+node.extname // 获取文件的扩展名，格式为 `.js`
+node.children // 子节点
+```
+
+## 依赖对象
+
+```
+dependency.raw // 在代码里写的原始字符串，如 ./a.png
+dependency.file // 依赖对应到硬盘上的文件路径，如 ./a.png 对应到硬盘上是 /Users/project/src/img/a.png
+
+dependency.amd  // 如果是一个 amd 模块，这个值一定为 true
+dependency.plugin // amd 加载资源的插件，如果不是用插件加载的资源，plugin 为空字符串
+dependency.module // 依赖位于哪个模块中
+```
+
+对于普通依赖来说，只需要关心 `raw` 和 `file`，举个例子：
+
+在 project/index.html 文件中有个图片，如下：
+
+```html
+
+<img src="./a.png" />
+```
+
+当我们分析这个依赖时，会提取出一个 dependency 对象，数据如下：
+
+```javascript
+{
+    raw: './a.png',
+    file: 'project/a.png'
+}
+```
+
+这样就能通过 `file` 去获取 md5，然后做一些替换工作。
+
+对于 AMD 来说，新增了 3 个属性，举个例子：
+
+```javascript
+define('demo', function (require) {
+    require('./a');
+    require('text!./b.html');
+});
+```
+
+对于 a 依赖来说，依赖对象如下：
+
+```javascript
+{
+    raw: './a',
+    file: '根据 amd config 分析出来的文件路径',
+    amd: true,
+    plugin: '',
+    module: 'demo'
+}
+```
+
+对于 b 依赖来说，依赖对象如下：
+
+```javascript
+{
+    raw: './b.html',
+    file: '根据 amd config 分析出来的文件路径',
+    amd: true,
+    plugin: 'text',
+    module: 'demo'
+}
+```
+
+
 ## 节点用法
 
 ```javascript
