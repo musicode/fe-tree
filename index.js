@@ -42,11 +42,12 @@ exports.parse = function (options) {
 
     var processFile = function (file) {
 
-        if (exports.dependencyMap[ file ]) {
-            return;
+        var node = exports.dependencyMap[ file ];
+        if (node) {
+            return node;
         }
 
-        var node = Node.create(file);
+        node = Node.create(file);
         exports.dependencyMap[ file ] = node;
 
         node.walk({
