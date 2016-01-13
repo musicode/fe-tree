@@ -66,7 +66,7 @@ exports.parse = function (options) {
                         return;
                     }
 
-                    node.addChild(child);
+                    node.addChild(child, dependency.async);
 
                     var parents = exports.reverseDependencyMap[ file ];
                     if (!Array.isArray(parents)) {
