@@ -1,10 +1,10 @@
 {
   "name": "fe-tree",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "static resource tree",
   "main": "index.js",
   "dependencies": {
-    "amd-deploy": "1.0.29"
+    "amd-deploy": "1.0.30"
   },
   "devDependencies": {},
   "scripts": {
