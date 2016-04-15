@@ -3,6 +3,8 @@
  * @author musicode
  */
 
+var path = require('path');
+
 var Node = require('./lib/Node');
 var util = require('./lib/util');
 
@@ -29,8 +31,9 @@ exports.reverseDependencyMap = { };
  * @property {Array} options.files 入口文件
  * @property {Array=} options.htmlRules 分析 html 文件的扩展规则
  * @property {Array=} options.cssRules 分析 css 文件的扩展规则
+ * @property {Array=} options.amdExcludes 不是 amd 的文件
  * @property {Object} options.amdConfig AMD require.config 配置
- * @property {Function} options.processDependency 处理依赖的函数。方法签名是(dependency, file)
+ * @property {Function} options.processDependency 处理依赖的函数。方法签名是(dependency, node)
  */
 exports.parse = function (options) {
 
@@ -38,21 +41,38 @@ exports.parse = function (options) {
 
     var htmlRules = options.htmlRules;
     var cssRules = options.cssRules;
+    var amdExcludes = options.amdExcludes;
     var amdConfig = options.amdConfig;
 
-    var processFile = function (file) {
+    var processFile = function (file, level) {
 
-        var node = exports.dependencyMap[ file ];
-        if (node) {
-            return node;
+        var node;
+
+        if (file instanceof Node) {
+            node = file;
+            file = node.file;
+        }
+        if (level == null) {
+            level = 0;
+        }
+        level++;
+
+        var logPrefix = new Array(level - 1).join('-');
+
+        var exists = exports.dependencyMap[ file ];
+        if (exists) {
+            return exists;
         }
 
-        node = Node.create(file);
+        if (!node) {
+            node = Node.create(file);
+        }
         exports.dependencyMap[ file ] = node;
 
         node.walk({
             htmlRules: htmlRules,
             cssRules: cssRules,
+            amdExcludes: amdExcludes,
             amdConfig: amdConfig,
             processDependency: function (dependency, node) {
 
@@ -60,21 +80,9 @@ exports.parse = function (options) {
                     && dependency.file !== node.file
                 ) {
                     var file = dependency.file;
-
-                    var child = processFile(file);
-                    if (!child) {
-                        return;
-                    }
-
-                    node.addChild(child, dependency.async);
-
-                    var parents = exports.reverseDependencyMap[ file ];
-                    if (!Array.isArray(parents)) {
-                        parents = exports.reverseDependencyMap[ file ] = [ ];
-                    }
-
-                    if (parents.indexOf(node.file) < 0) {
-                        parents.push(node.file);
+                    var child = processFile(file, level);
+                    if (child) {
+                        exports.addChild(node, child, dependency.async);
                     }
                 }
 
@@ -92,6 +100,119 @@ exports.parse = function (options) {
     files.forEach(processFile);
 
 };
+
+exports.addChild = function (node, child, async) {
+
+    var file = child.file;
+    if (node.file === file) {
+        return;
+    }
+
+    node.addChild(child, async);
+
+    var parents = exports.reverseDependencyMap[ file ];
+    if (!Array.isArray(parents)) {
+        parents = exports.reverseDependencyMap[ file ] = [ ];
+    }
+
+    if (parents.indexOf(node.file) < 0) {
+        parents.push(node.file);
+    }
+};
+
+/**
+ * 分析入口文件，生成正反两棵依赖树
+ *
+ * @param {Object} options
+ * @property {Array} options.nodes 需要 md5 化的节点
+ * @property {Array=} options.htmlRules 分析 html 文件的扩展规则
+ * @property {Array=} options.cssRules 分析 css 文件的扩展规则
+ * @property {Array=} options.amdExcludes 不是 amd 的文件
+ * @property {Object} options.amdConfig AMD require.config 配置
+ * @property {Function} options.processDependency 处理依赖的函数。方法签名是(dependency, node)
+ */
+exports.md5 = function (options) {
+
+    var nodes = options.nodes.map(function (node) {
+        return new Node(
+            util.getHashedFile(node.file, node.calculate()),
+            node.content.slice(0, node.content.length)
+        );
+    });
+
+    exports.parse({
+        files: nodes,
+        htmlRules: options.htmlRules,
+        cssRules: options.cssRules,
+        amdExcludes: options.amdExcludes,
+        amdConfig: options.amdConfig,
+        processDependency: options.processDependency
+    });
+
+    nodes.forEach(function (node) {
+        node.walk({
+            htmlRules: options.htmlRules,
+            cssRules: options.cssRules,
+            amdExcludes: options.amdExcludes,
+            amdConfig: options.amdConfig,
+            processDependency: function (dependency, node) {
+                dependency = options.processDependency(dependency, node);
+                if (!dependency) {
+                    return;
+                }
+
+                node = exports.dependencyMap[dependency.file];
+
+                if (!node) {
+                    return;
+                }
+
+                dependency.raw = util.getHashedFile(
+                    dependency.raw,
+                    node.calculate()
+                );
+
+                return dependency;
+            }
+        })
+    });
+
+
+};
+
+/**
+ * 更新依赖表的文件引用路径
+ *
+ * @param {string} newFile
+ * @param {string} oldFile
+ */
+exports.updateFile = function (newFile, oldFile) {
+
+    var dependencyMap = exports.dependencyMap;
+    var reverseDependencyMap = exports.reverseDependencyMap;
+
+    for (var key in dependencyMap) {
+        var node = dependencyMap[key];
+        if (key === oldFile) {
+            node.file = newFile;
+            dependencyMap[newFile] = node;
+            delete dependencyMap[oldFile];
+        }
+    }
+
+    for (var key in reverseDependencyMap) {
+        var files = reverseDependencyMap[key];
+        if (key === oldFile) {
+            reverseDependencyMap[newFile] = files;
+            delete reverseDependencyMap[oldFile];
+        }
+        var index = files.indexOf(oldFile);
+        if (index >= 0) {
+            files[index] = newFile;
+        }
+    }
+
+}
 
 /**
  * 持久化 json
