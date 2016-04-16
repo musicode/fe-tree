@@ -57,9 +57,12 @@ exports.parse = function (options) {
         }
         level++;
 
-        var logPrefix = new Array(level - 1).join('-');
+        var logPrefix = new Array(level - 1).join('----');
 
         var exists = exports.dependencyMap[ file ];
+        if (exports.debug) {
+            console.log(logPrefix, 1, file, exists ? 1 : 0);
+        }
         if (exists) {
             return exists;
         }
@@ -69,16 +72,23 @@ exports.parse = function (options) {
         }
         exports.dependencyMap[ file ] = node;
 
+        if (exports.debug) {
+            console.log(logPrefix, 2, file);
+        }
         node.walk({
             htmlRules: htmlRules,
             cssRules: cssRules,
             amdExcludes: amdExcludes,
             amdConfig: amdConfig,
             processDependency: function (dependency, node) {
-
-                if (options.processDependency(dependency, node)
-                    && dependency.file !== node.file
-                ) {
+                if (exports.debug) {
+                    console.log(logPrefix, 3, node.file, dependency.raw);
+                }
+                dependency = options.processDependency(dependency, node);
+                if (dependency) {
+                    if (exports.debug) {
+                        console.log(logPrefix, 4, node.file, dependency);
+                    }
                     var file = dependency.file;
                     var child = processFile(file, level);
                     if (child) {
