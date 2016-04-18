@@ -131,66 +131,6 @@ exports.addChild = function (node, child, async) {
 };
 
 /**
- * 分析入口文件，生成正反两棵依赖树
- *
- * @param {Object} options
- * @property {Array} options.nodes 需要 md5 化的节点
- * @property {Array=} options.htmlRules 分析 html 文件的扩展规则
- * @property {Array=} options.cssRules 分析 css 文件的扩展规则
- * @property {Array=} options.amdExcludes 不是 amd 的文件
- * @property {Object} options.amdConfig AMD require.config 配置
- * @property {Function} options.processDependency 处理依赖的函数。方法签名是(dependency, node)
- */
-exports.md5 = function (options) {
-
-    var nodes = options.nodes.map(function (node) {
-        return new Node(
-            util.getHashedFile(node.file, node.calculate()),
-            node.content.slice(0, node.content.length)
-        );
-    });
-
-    exports.parse({
-        files: nodes,
-        htmlRules: options.htmlRules,
-        cssRules: options.cssRules,
-        amdExcludes: options.amdExcludes,
-        amdConfig: options.amdConfig,
-        processDependency: options.processDependency
-    });
-
-    nodes.forEach(function (node) {
-        node.walk({
-            htmlRules: options.htmlRules,
-            cssRules: options.cssRules,
-            amdExcludes: options.amdExcludes,
-            amdConfig: options.amdConfig,
-            processDependency: function (dependency, node) {
-                dependency = options.processDependency(dependency, node);
-                if (!dependency) {
-                    return;
-                }
-
-                node = exports.dependencyMap[dependency.file];
-
-                if (!node) {
-                    return;
-                }
-
-                dependency.raw = util.getHashedFile(
-                    dependency.raw,
-                    node.calculate()
-                );
-
-                return dependency;
-            }
-        })
-    });
-
-
-};
-
-/**
  * 更新依赖表的文件引用路径
  *
  * @param {string} newFile
